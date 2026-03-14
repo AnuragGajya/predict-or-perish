@@ -243,7 +243,7 @@ function calculateResult() {
 }
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8000;
 server.listen(PORT, () => {
   console.log(`Predict or Perish running on http://localhost:${PORT}`);
 });
