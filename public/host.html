@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Predict or Perish — Host Dashboard</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
+</head>
+<body class="host-page">
+
+  <div class="scanlines"></div>
+
+  <!-- GAMEOVER OVERLAY -->
+  <div id="gameoverOverlay" class="gameover-overlay hidden">
+    <div class="gameover-content">
+      <div class="go-tag">PREDICT OR PERISH</div>
+      <div class="go-label">WINNER</div>
+      <div class="go-name" id="goWinnerName">—</div>
+      <button id="goReset" class="btn btn-outline go-reset">RESET GAME</button>
+    </div>
+  </div>
+
+  <!-- MAIN DASHBOARD -->
+  <div class="host-layout">
+
+    <!-- TOP BAR -->
+    <header class="host-header">
+      <div class="header-left">
+        <span class="header-title">PREDICT OR PERISH</span>
+        <span class="header-sep">|</span>
+        <span class="header-sub">HOST DASHBOARD</span>
+      </div>
+      <div class="header-right">
+        <span class="phase-badge" id="phaseBadge">LOBBY</span>
+        <span class="round-badge" id="roundBadge">ROUND 0</span>
+      </div>
+    </header>
+
+    <!-- MAIN GRID -->
+    <div class="host-grid">
+
+      <!-- LEFT COLUMN -->
+      <div class="host-col host-col-left">
+
+        <!-- Active Players -->
+        <div class="host-card">
+          <div class="card-header">
+            <span class="card-title">ACTIVE PLAYERS</span>
+            <span class="card-count" id="activeCount">0</span>
+          </div>
+          <div class="player-list" id="activePlayerList">
+            <div class="empty-state">Waiting for players to join...</div>
+          </div>
+        </div>
+
+        <!-- Eliminated Players -->
+        <div class="host-card">
+          <div class="card-header">
+            <span class="card-title">ELIMINATED</span>
+            <span class="card-count elim-count" id="elimCount">0</span>
+          </div>
+          <div class="player-list" id="elimPlayerList">
+            <div class="empty-state">None yet</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- CENTER COLUMN -->
+      <div class="host-col host-col-center">
+
+        <!-- Submissions -->
+        <div class="host-card">
+          <div class="card-header">
+            <span class="card-title">SUBMISSIONS</span>
+            <span class="card-count" id="subCount">0 / 0</span>
+          </div>
+          <div class="submission-list" id="submissionList">
+            <div class="empty-state">Start a round to collect numbers</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="host-col host-col-right">
+
+        <!-- Result Panel -->
+        <div class="host-card" id="resultCard">
+          <div class="card-header">
+            <span class="card-title">CALCULATION</span>
+          </div>
+          <div id="resultContent" class="result-content">
+            <div class="empty-state">No results yet</div>
+          </div>
+        </div>
+
+        <!-- Host Controls -->
+        <div class="host-card controls-card">
+          <div class="card-header">
+            <span class="card-title">CONTROLS</span>
+          </div>
+          <div class="controls-grid">
+            <button id="btnStartRound" class="ctrl-btn ctrl-green">START ROUND</button>
+            <button id="btnCalculate" class="ctrl-btn ctrl-blue" disabled>CALCULATE</button>
+            <button id="btnNextRound" class="ctrl-btn ctrl-yellow" disabled>NEXT ROUND</button>
+            <button id="btnEndGame" class="ctrl-btn ctrl-red">END GAME</button>
+            <button id="btnReset" class="ctrl-btn ctrl-ghost">RESET GAME</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/host.js"></script>
+</body>
+</html>

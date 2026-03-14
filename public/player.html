@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Predict or Perish — Player</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
+</head>
+<body class="player-page">
+
+  <div class="scanlines"></div>
+
+  <!-- JOIN SCREEN -->
+  <div id="screen-join" class="screen active">
+    <div class="screen-inner">
+      <a href="/" class="back-link">← Back</a>
+      <div class="screen-title">PLAYER JOIN</div>
+      <p class="screen-sub">Enter your name to join the game</p>
+      <div class="input-group">
+        <input type="text" id="nameInput" placeholder="Your name..." maxlength="20" autocomplete="off" />
+        <button id="joinBtn" class="btn btn-primary">JOIN GAME</button>
+      </div>
+      <div id="joinError" class="error-msg"></div>
+    </div>
+  </div>
+
+  <!-- LOBBY SCREEN -->
+  <div id="screen-lobby" class="screen">
+    <div class="screen-inner">
+      <div class="player-badge" id="lobbyName"></div>
+      <div class="screen-title">WAITING</div>
+      <div class="pulse-ring"></div>
+      <p class="screen-sub">Host will start the round soon...</p>
+      <div class="round-indicator" id="lobbyRound"></div>
+    </div>
+  </div>
+
+  <!-- ROUND SCREEN -->
+  <div id="screen-round" class="screen">
+    <div class="screen-inner">
+      <div class="player-badge" id="roundName"></div>
+      <div class="round-label" id="roundLabel">ROUND 1</div>
+      <p class="screen-sub">Choose your number carefully</p>
+      <div class="number-input-wrapper">
+        <input type="number" id="numberInput" min="0" max="100" placeholder="0 – 100" />
+        <div class="number-range-hint">Between 0 and 100</div>
+      </div>
+      <button id="submitBtn" class="btn btn-danger btn-large">SUBMIT NUMBER</button>
+    </div>
+  </div>
+
+  <!-- SUBMITTED SCREEN -->
+  <div id="screen-submitted" class="screen">
+    <div class="screen-inner">
+      <div class="player-badge" id="submittedName"></div>
+      <div class="screen-title">SUBMITTED</div>
+      <div class="submitted-number" id="submittedNumber"></div>
+      <div class="waiting-dots">
+        <span></span><span></span><span></span>
+      </div>
+      <p class="screen-sub">Waiting for other players...</p>
+    </div>
+  </div>
+
+  <!-- RESULT SCREEN -->
+  <div id="screen-result" class="screen">
+    <div class="screen-inner">
+      <div class="round-label" id="resultRound">ROUND 1 RESULTS</div>
+      <div id="resultPersonal" class="result-personal"></div>
+      <div class="result-stats">
+        <div class="stat-row">
+          <span class="stat-label">AVERAGE</span>
+          <span class="stat-value" id="resultAvg">—</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">TARGET (×0.8)</span>
+          <span class="stat-value highlight-green" id="resultTarget">—</span>
+        </div>
+        <div class="stat-row winner-row">
+          <span class="stat-label">WINNER</span>
+          <span class="stat-value winner-name" id="resultWinner">—</span>
+        </div>
+        <div class="stat-row elim-row">
+          <span class="stat-label">ELIMINATED</span>
+          <span class="stat-value elim-name" id="resultElim">—</span>
+        </div>
+      </div>
+      <p class="screen-sub waiting-text">Waiting for host to continue...</p>
+    </div>
+  </div>
+
+  <!-- ELIMINATED SCREEN -->
+  <div id="screen-eliminated" class="screen">
+    <div class="screen-inner eliminated-screen">
+      <div class="elim-symbol">✕</div>
+      <div class="screen-title elim-title">ELIMINATED</div>
+      <p class="screen-sub">Better luck next time.</p>
+      <a href="/" class="btn btn-outline">Back to Home</a>
+    </div>
+  </div>
+
+  <!-- GAMEOVER SCREEN -->
+  <div id="screen-gameover" class="screen">
+    <div class="screen-inner gameover-screen">
+      <div class="screen-title">GAME OVER</div>
+      <p class="screen-sub">The final winner is</p>
+      <div class="final-winner-name" id="gameoverWinner">—</div>
+      <a href="/" class="btn btn-outline">Back to Home</a>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/player.js"></script>
+</body>
+</html>
