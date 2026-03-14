@@ -500,3 +500,46 @@ input:focus { border-color: var(--green); box-shadow: 0 0 12px var(--green-glow)
   .host-grid { grid-template-columns: 1fr; }
   .host-col-center { max-height: 250px; }
 }
+
+/* ── Room System Additions ────────────────────────────────────────────────── */
+.room-setup-screen {
+  display: none; min-height: 100vh;
+  align-items: center; justify-content: center;
+}
+.room-setup-screen.active { display: flex; }
+.room-setup-screen.hidden { display: none !important; }
+
+.room-setup-inner {
+  width: 100%; max-width: 440px; padding: 2rem 1.5rem;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 1.2rem; text-align: center;
+  animation: fadeUp 0.6s ease both;
+}
+
+.setup-title {
+  font-family: var(--display); font-size: 3rem; letter-spacing: 0.1em;
+}
+.setup-sub {
+  font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.25em;
+  color: var(--text-dim); margin-top: -0.8rem;
+}
+.setup-hint {
+  font-family: var(--mono); font-size: 0.68rem; color: var(--text-dim);
+  letter-spacing: 0.08em; line-height: 1.6;
+}
+
+.host-layout.hidden { display: none !important; }
+
+.room-code-badge {
+  font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.2em;
+  padding: 0.3rem 0.9rem;
+  background: rgba(46,204,113,0.1); border: 1px solid var(--green);
+  color: var(--green); font-weight: 600;
+}
+
+.room-badge {
+  font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.18em;
+  color: var(--green); background: rgba(46,204,113,0.08);
+  border: 1px solid rgba(46,204,113,0.3);
+  padding: 0.25rem 0.75rem;
+}

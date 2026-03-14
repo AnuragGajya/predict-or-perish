@@ -1,10 +1,7 @@
 const socket = io();
-
-// ── State ─────────────────────────────────────────────────────────────────────
 let myName = "";
 let hasJoined = false;
 
-// ── DOM refs ──────────────────────────────────────────────────────────────────
 const screens = {
   join:       document.getElementById("screen-join"),
   lobby:      document.getElementById("screen-lobby"),
@@ -16,22 +13,21 @@ const screens = {
 };
 
 function showScreen(name) {
-  Object.entries(screens).forEach(([k, el]) => {
-    el.classList.toggle("active", k === name);
-  });
+  Object.entries(screens).forEach(([k, el]) => el.classList.toggle("active", k === name));
 }
 
-// ── Join ──────────────────────────────────────────────────────────────────────
+// Join
 document.getElementById("joinBtn").addEventListener("click", () => {
+  const roomCode = document.getElementById("roomInput").value.trim().toUpperCase();
   const name = document.getElementById("nameInput").value.trim();
+  if (!roomCode) { showError("Please enter a room code."); return; }
   if (!name) { showError("Please enter your name."); return; }
   myName = name;
-  socket.emit("joinPlayer", { name });
+  socket.emit("joinPlayer", { name, roomCode });
 });
 
-document.getElementById("nameInput").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") document.getElementById("joinBtn").click();
-});
+document.getElementById("nameInput").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("joinBtn").click(); });
+document.getElementById("roomInput").addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase(); });
 
 socket.on("joinError", (msg) => showError(msg));
 
@@ -40,7 +36,7 @@ function showError(msg) {
   setTimeout(() => document.getElementById("joinError").textContent = "", 3000);
 }
 
-// ── Submit Number ─────────────────────────────────────────────────────────────
+// Submit number
 document.getElementById("submitBtn").addEventListener("click", () => {
   const val = document.getElementById("numberInput").value;
   const n = parseFloat(val);
@@ -55,39 +51,26 @@ document.getElementById("submitBtn").addEventListener("click", () => {
   showScreen("submitted");
 });
 
-document.getElementById("numberInput").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") document.getElementById("submitBtn").click();
-});
+document.getElementById("numberInput").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("submitBtn").click(); });
 
-// ── Player State from server ──────────────────────────────────────────────────
+// Player state from server
 socket.on("playerState", (state) => {
-  if (!hasJoined && state.name) {
-    hasJoined = true;
-    myName = state.name;
-  }
+  if (!hasJoined && state.name) { hasJoined = true; myName = state.name; }
 
-  if (state.status === "eliminated" && state.phase !== "gameover") {
-    showScreen("eliminated");
-    return;
-  }
-
+  if (state.status === "eliminated" && state.phase !== "gameover") { showScreen("eliminated"); return; }
   if (state.phase === "gameover") {
     document.getElementById("gameoverWinner").textContent = state.finalWinner || "—";
-    showScreen("gameover");
-    return;
+    showScreen("gameover"); return;
   }
-
   if (state.phase === "lobby") {
     document.getElementById("lobbyName").textContent = `PLAYER: ${state.name?.toUpperCase()}`;
+    document.getElementById("lobbyRoom").textContent = `ROOM: ${state.roomCode}`;
     document.getElementById("lobbyRound").textContent = state.round > 0 ? `ROUND ${state.round} COMPLETE` : "";
-    showScreen("lobby");
-    return;
+    showScreen("lobby"); return;
   }
-
   if (state.phase === "round") {
-    if (state.submitted) {
-      showScreen("submitted");
-    } else {
+    if (state.submitted) { showScreen("submitted"); }
+    else {
       document.getElementById("roundName").textContent = `PLAYER: ${state.name?.toUpperCase()}`;
       document.getElementById("roundLabel").textContent = `ROUND ${state.round}`;
       document.getElementById("numberInput").value = "";
@@ -95,47 +78,24 @@ socket.on("playerState", (state) => {
     }
     return;
   }
-
-  if (state.phase === "calculating") {
-    showScreen("submitted");
-    return;
-  }
-
-  if (state.phase === "results" && state.lastResult) {
-    renderResultScreen(state);
-    return;
-  }
+  if (state.phase === "calculating") { showScreen("submitted"); return; }
+  if (state.phase === "results" && state.lastResult) { renderResultScreen(state); return; }
 });
 
 function renderResultScreen(state) {
   const r = state.lastResult;
   const name = state.name;
-
   document.getElementById("resultRound").textContent = `ROUND ${state.round} RESULTS`;
   document.getElementById("resultAvg").textContent = r.average;
   document.getElementById("resultTarget").textContent = r.target;
   document.getElementById("resultWinner").textContent = r.winnerName;
   document.getElementById("resultElim").textContent = r.eliminatedName;
-
   const personal = document.getElementById("resultPersonal");
-  if (name === r.winnerName) {
-    personal.textContent = "🏆 YOU WIN THIS ROUND";
-    personal.className = "result-personal you-won";
-  } else if (name === r.eliminatedName) {
-    personal.textContent = "✕ YOU ARE ELIMINATED";
-    personal.className = "result-personal you-lost";
-  } else {
-    personal.textContent = "✓ YOU SURVIVED";
-    personal.className = "result-personal you-survived";
-  }
-
+  if (name === r.winnerName) { personal.textContent = "🏆 YOU WIN THIS ROUND"; personal.className = "result-personal you-won"; }
+  else if (name === r.eliminatedName) { personal.textContent = "✕ YOU ARE ELIMINATED"; personal.className = "result-personal you-lost"; }
+  else { personal.textContent = "✓ YOU SURVIVED"; personal.className = "result-personal you-survived"; }
   showScreen("result");
 }
 
-// ── Force reload on reset ─────────────────────────────────────────────────────
-socket.on("forceReload", () => {
-  window.location.href = "/";
-});
-
-// ── Initial screen ────────────────────────────────────────────────────────────
+socket.on("forceReload", () => { window.location.href = "/"; });
 showScreen("join");

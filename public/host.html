@@ -8,8 +8,23 @@
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
 </head>
 <body class="host-page">
-
   <div class="scanlines"></div>
+
+  <!-- ROOM SETUP SCREEN -->
+  <div id="screen-setup" class="room-setup-screen active">
+    <div class="room-setup-inner">
+      <a href="/" class="back-link">← Back</a>
+      <div class="setup-title">PREDICT OR PERISH</div>
+      <div class="setup-sub">HOST DASHBOARD</div>
+      <p class="screen-sub">Create a room code for your players to join</p>
+      <div class="input-group">
+        <input type="text" id="roomCodeInput" placeholder="Enter room code (e.g. GAME1)" maxlength="10" autocomplete="off" style="text-transform:uppercase;font-size:1.5rem;text-align:center;letter-spacing:0.2em" />
+        <button id="createRoomBtn" class="btn btn-primary">CREATE ROOM</button>
+      </div>
+      <div id="setupError" class="error-msg"></div>
+      <div class="setup-hint">Share this code with players so they can join your room</div>
+    </div>
+  </div>
 
   <!-- GAMEOVER OVERLAY -->
   <div id="gameoverOverlay" class="gameover-overlay hidden">
@@ -22,9 +37,7 @@
   </div>
 
   <!-- MAIN DASHBOARD -->
-  <div class="host-layout">
-
-    <!-- TOP BAR -->
+  <div id="screen-dashboard" class="host-layout hidden">
     <header class="host-header">
       <div class="header-left">
         <span class="header-title">PREDICT OR PERISH</span>
@@ -32,18 +45,15 @@
         <span class="header-sub">HOST DASHBOARD</span>
       </div>
       <div class="header-right">
+        <span class="room-code-badge" id="roomCodeBadge">ROOM: —</span>
         <span class="phase-badge" id="phaseBadge">LOBBY</span>
         <span class="round-badge" id="roundBadge">ROUND 0</span>
       </div>
     </header>
 
-    <!-- MAIN GRID -->
     <div class="host-grid">
-
-      <!-- LEFT COLUMN -->
+      <!-- LEFT -->
       <div class="host-col host-col-left">
-
-        <!-- Active Players -->
         <div class="host-card">
           <div class="card-header">
             <span class="card-title">ACTIVE PLAYERS</span>
@@ -53,8 +63,6 @@
             <div class="empty-state">Waiting for players to join...</div>
           </div>
         </div>
-
-        <!-- Eliminated Players -->
         <div class="host-card">
           <div class="card-header">
             <span class="card-title">ELIMINATED</span>
@@ -64,13 +72,10 @@
             <div class="empty-state">None yet</div>
           </div>
         </div>
-
       </div>
 
-      <!-- CENTER COLUMN -->
+      <!-- CENTER -->
       <div class="host-col host-col-center">
-
-        <!-- Submissions -->
         <div class="host-card">
           <div class="card-header">
             <span class="card-title">SUBMISSIONS</span>
@@ -80,13 +85,10 @@
             <div class="empty-state">Start a round to collect numbers</div>
           </div>
         </div>
-
       </div>
 
-      <!-- RIGHT COLUMN -->
+      <!-- RIGHT -->
       <div class="host-col host-col-right">
-
-        <!-- Result Panel -->
         <div class="host-card" id="resultCard">
           <div class="card-header">
             <span class="card-title">CALCULATION</span>
@@ -95,8 +97,6 @@
             <div class="empty-state">No results yet</div>
           </div>
         </div>
-
-        <!-- Host Controls -->
         <div class="host-card controls-card">
           <div class="card-header">
             <span class="card-title">CONTROLS</span>
@@ -109,7 +109,6 @@
             <button id="btnReset" class="ctrl-btn ctrl-ghost">RESET GAME</button>
           </div>
         </div>
-
       </div>
     </div>
   </div>
