@@ -13,11 +13,10 @@ const io = new Server(server, {
 
 app.use(express.static(path.join(__dirname, "public")));
 
-// ─── Rooms Store ──────────────────────────────────────────────────────────────
 const rooms = {};
 
 function createRoomState() {
-  return { phase: "lobby", round: 0, players: {}, eliminated: [], lastResult: null, finalWinner: null };
+  return { phase: "lobby", round: 0, players: {}, eliminated: [], lastResult: null, finalWinner: null, resultsRevealed: false };
 }
 
 function getRoom(code) { return rooms[code?.toUpperCase()]; }
@@ -32,22 +31,19 @@ function resetNumbers(state) {
     state.players[id].distance = null;
     state.players[id].submitted = false;
   });
+  state.resultsRevealed = false;
 }
 
-// Send host state — numbers hidden during round, shown only after all submitted
 function getHostState(state) {
   const active = activePlayers(state);
   const allSubmitted = active.length > 0 && active.every((p) => p.submitted);
-  
   const sanitizedPlayers = {};
   Object.entries(state.players).forEach(([id, p]) => {
     sanitizedPlayers[id] = {
       ...p,
-      // Hide number during round unless all have submitted
       number: (state.phase === "round" && !allSubmitted) ? null : p.number,
     };
   });
-
   return { ...state, players: sanitizedPlayers, allSubmitted };
 }
 
@@ -56,10 +52,8 @@ function broadcastState(roomCode) {
   if (!room) return;
   const state = room.state;
 
-  // Send host state (numbers hidden until all submitted)
   io.to(`host:${roomCode}`).emit("gameState", getHostState(state));
 
-  // Send each player only their own state — NOT triggering full re-render
   Object.entries(state.players).forEach(([id, p]) => {
     const socket = io.sockets.sockets.get(id);
     if (socket) {
@@ -69,7 +63,8 @@ function broadcastState(roomCode) {
         name: p.name,
         status: p.status,
         submitted: p.submitted,
-        lastResult: state.lastResult,
+        // Only send result to players if host has revealed it
+        lastResult: state.resultsRevealed ? state.lastResult : null,
         finalWinner: state.finalWinner,
         roomCode,
       });
@@ -78,7 +73,7 @@ function broadcastState(roomCode) {
 }
 
 io.on("connection", (socket) => {
-  // Host creates room
+
   socket.on("createRoom", ({ code }) => {
     const roomCode = code.trim().toUpperCase().slice(0, 10);
     if (!roomCode) { socket.emit("roomError", "Invalid room code."); return; }
@@ -91,7 +86,6 @@ io.on("connection", (socket) => {
     socket.emit("gameState", getHostState(rooms[roomCode].state));
   });
 
-  // Host rejoins
   socket.on("rejoinHost", ({ roomCode }) => {
     const room = getRoom(roomCode);
     if (!room) { socket.emit("roomError", "Room not found."); return; }
@@ -103,7 +97,6 @@ io.on("connection", (socket) => {
     socket.emit("gameState", getHostState(room.state));
   });
 
-  // Player joins room
   socket.on("joinPlayer", ({ name, roomCode }) => {
     const code = roomCode.trim().toUpperCase();
     const room = getRoom(code);
@@ -121,7 +114,6 @@ io.on("connection", (socket) => {
     broadcastState(code);
   });
 
-  // Player submits number
   socket.on("submitNumber", ({ number }) => {
     const room = getRoom(socket.data.roomCode);
     if (!room) return;
@@ -132,25 +124,17 @@ io.on("connection", (socket) => {
     player.number = n;
     player.submitted = true;
 
-    // Send player their confirmation immediately
+    // Confirm to this player immediately
     socket.emit("playerState", {
       phase: room.state.phase, round: room.state.round,
       name: player.name, status: player.status,
-      submitted: true, lastResult: room.state.lastResult,
+      submitted: true, lastResult: null,
       finalWinner: room.state.finalWinner, roomCode: socket.data.roomCode,
     });
 
-    // Broadcast updated status to host
     broadcastState(socket.data.roomCode);
-
-    // Auto-calculate if all submitted
-    const active = activePlayers(room.state);
-    if (active.length > 1 && active.every((p) => p.submitted)) {
-      setTimeout(() => calculateResult(socket.data.roomCode), 800);
-    }
   });
 
-  // Host controls
   socket.on("startRound", () => {
     const room = getRoom(socket.data.roomCode);
     if (!room || (room.state.phase !== "lobby" && room.state.phase !== "results")) return;
@@ -161,9 +145,60 @@ io.on("connection", (socket) => {
     broadcastState(socket.data.roomCode);
   });
 
-  socket.on("calculateResult", () => {
-    const room = getRoom(socket.data.roomCode);
-    if (room?.state.phase === "round") calculateResult(socket.data.roomCode);
+  // Host clicks "Show Result" — calculates AND reveals to players
+  socket.on("showResult", () => {
+    const roomCode = socket.data.roomCode;
+    const room = getRoom(roomCode);
+    if (!room || room.state.phase !== "round") return;
+
+    // Calculate
+    const state = room.state;
+    const submitted = activePlayers(state).filter((p) => p.submitted && p.number !== null);
+    if (submitted.length === 0) return;
+
+    const avg = submitted.reduce((sum, p) => sum + p.number, 0) / submitted.length;
+    const target = avg * 0.8;
+    submitted.forEach((p) => { p.distance = Math.abs(p.number - target); });
+    submitted.sort((a, b) => a.distance - b.distance);
+
+    const winner = submitted[0];
+    const loser  = submitted[submitted.length - 1];
+    const winnerId    = Object.entries(state.players).find(([, v]) => v.name === winner.name)?.[0];
+    const eliminatedId = Object.entries(state.players).find(([, v]) => v.name === loser.name)?.[0];
+
+    state.lastResult = {
+      average: Math.round(avg * 100) / 100,
+      target: Math.round(target * 100) / 100,
+      winnerId, winnerName: winner.name,
+      eliminatedId, eliminatedName: loser.name,
+      submissions: submitted.map((p) => ({
+        name: p.name, number: p.number,
+        distance: Math.round(p.distance * 100) / 100,
+      })),
+    };
+
+    // Check if this was the final round (only 2 active players)
+    const activeCount = activePlayers(state).length;
+    const isFinalRound = activeCount <= 2;
+
+    if (isFinalRound) {
+      // Apply elimination
+      const loserPlayer = state.players[eliminatedId];
+      if (loserPlayer) {
+        loserPlayer.status = "eliminated";
+        state.eliminated.push({ name: loserPlayer.name, round: state.round });
+      }
+      // Set final winner
+      const remaining = activePlayers(state);
+      state.finalWinner = remaining.length > 0 ? remaining[0].name : winner.name;
+      state.phase = "gameover";
+      state.resultsRevealed = true;
+    } else {
+      state.phase = "results";
+      state.resultsRevealed = true;
+    }
+
+    broadcastState(roomCode);
   });
 
   socket.on("nextRound", () => {
@@ -178,18 +213,17 @@ io.on("connection", (socket) => {
     broadcastState(socket.data.roomCode);
   });
 
+  // End game — send everyone to home page
   socket.on("endGame", () => {
-    const room = getRoom(socket.data.roomCode);
+    const roomCode = socket.data.roomCode;
+    const room = getRoom(roomCode);
     if (!room) return;
-    const state = room.state;
-    if (state.lastResult?.eliminatedId && state.phase === "results") {
-      const p = state.players[state.lastResult.eliminatedId];
-      if (p && p.status === "active") { p.status = "eliminated"; state.eliminated.push({ name: p.name, round: state.round }); }
-    }
-    const remaining = activePlayers(state);
-    state.finalWinner = remaining.length > 0 ? remaining[0].name : "No Winner";
-    state.phase = "gameover";
-    broadcastState(socket.data.roomCode);
+    // Send all players to home
+    Object.keys(room.state.players).forEach((id) => {
+      io.sockets.sockets.get(id)?.emit("forceReload");
+    });
+    delete rooms[roomCode];
+    console.log(`Room ${roomCode} ended and closed`);
   });
 
   socket.on("resetGame", () => {
@@ -212,30 +246,6 @@ io.on("connection", (socket) => {
     }
   });
 });
-
-function calculateResult(roomCode) {
-  const room = getRoom(roomCode);
-  if (!room) return;
-  const state = room.state;
-  state.phase = "calculating";
-  const submitted = activePlayers(state).filter((p) => p.submitted && p.number !== null);
-  if (submitted.length === 0) { state.phase = "round"; broadcastState(roomCode); return; }
-  const avg = submitted.reduce((sum, p) => sum + p.number, 0) / submitted.length;
-  const target = avg * 0.8;
-  submitted.forEach((p) => { p.distance = Math.abs(p.number - target); });
-  submitted.sort((a, b) => a.distance - b.distance);
-  const winner = submitted[0];
-  const loser = submitted[submitted.length - 1];
-  const winnerId = Object.entries(state.players).find(([, v]) => v.name === winner.name)?.[0];
-  const eliminatedId = Object.entries(state.players).find(([, v]) => v.name === loser.name)?.[0];
-  state.lastResult = {
-    average: Math.round(avg * 100) / 100, target: Math.round(target * 100) / 100,
-    winnerId, winnerName: winner.name, eliminatedId, eliminatedName: loser.name,
-    submissions: submitted.map((p) => ({ name: p.name, number: p.number, distance: Math.round(p.distance * 100) / 100 })),
-  };
-  state.phase = "results";
-  broadcastState(roomCode);
-}
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => console.log(`Predict or Perish running on http://localhost:${PORT}`));

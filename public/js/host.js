@@ -2,7 +2,7 @@ const socket = io({ transports: ["websocket", "polling"] });
 let currentRoomCode = null;
 let latestState = null;
 
-// ── Setup Screen ──────────────────────────────────────────────────────────────
+// ── Setup ─────────────────────────────────────────────────────────────────────
 const setupScreen     = document.getElementById("screen-setup");
 const dashboardScreen = document.getElementById("screen-dashboard");
 const roomCodeInput   = document.getElementById("roomCodeInput");
@@ -15,7 +15,7 @@ createRoomBtn.addEventListener("click", () => {
   socket.emit("createRoom", { code });
 });
 roomCodeInput.addEventListener("keydown", (e) => { if (e.key === "Enter") createRoomBtn.click(); });
-roomCodeInput.addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase(); });
+roomCodeInput.addEventListener("input",   (e) => { e.target.value = e.target.value.toUpperCase(); });
 socket.on("roomError", (msg) => { setupError.textContent = msg; });
 
 socket.on("roomCreated", ({ roomCode }) => {
@@ -26,7 +26,7 @@ socket.on("roomCreated", ({ roomCode }) => {
   dashboardScreen.classList.remove("hidden");
 });
 
-// ── DOM refs ──────────────────────────────────────────────────────────────────
+// ── DOM ───────────────────────────────────────────────────────────────────────
 const phaseBadge       = document.getElementById("phaseBadge");
 const roundBadge       = document.getElementById("roundBadge");
 const activeCount      = document.getElementById("activeCount");
@@ -39,46 +39,53 @@ const resultPopup      = document.getElementById("resultPopup");
 const winnerOverlay    = document.getElementById("winnerOverlay");
 
 const btnStart      = document.getElementById("btnStartRound");
-const btnCalc       = document.getElementById("btnCalculate");
 const btnShowResult = document.getElementById("btnShowResult");
 const btnNext       = document.getElementById("btnNextRound");
-const btnEnd        = document.getElementById("btnEndGame");
 const btnReset      = document.getElementById("btnReset");
+const btnEndGame    = document.getElementById("btnEndGame");
 const popupClose    = document.getElementById("popupClose");
-const winnerReset   = document.getElementById("winnerReset");
 
 btnStart.addEventListener("click",      () => socket.emit("startRound"));
-btnCalc.addEventListener("click",       () => socket.emit("calculateResult"));
-btnShowResult.addEventListener("click", () => showResultPopup(latestState));
+btnShowResult.addEventListener("click", () => socket.emit("showResult"));
 btnNext.addEventListener("click",       () => { closeResultPopup(); socket.emit("nextRound"); });
-btnEnd.addEventListener("click",        () => { if (confirm("End the game and reveal the final winner?")) socket.emit("endGame"); });
 btnReset.addEventListener("click",      () => { if (confirm("Reset the entire game?")) socket.emit("resetGame"); });
-winnerReset.addEventListener("click",   () => { if (confirm("Reset the entire game?")) socket.emit("resetGame"); });
+btnEndGame.addEventListener("click",    () => { if (confirm("End game and send everyone to home?")) socket.emit("endGame"); });
 popupClose.addEventListener("click",    () => closeResultPopup());
 
+// ── Game State ────────────────────────────────────────────────────────────────
 socket.on("gameState", (state) => {
   latestState = state;
   updateHeader(state);
   updatePlayers(state);
   updateSubmissions(state);
   updateControls(state);
-  updateWinner(state);
+
+  // Show result popup when phase becomes results
+  if (state.phase === "results" && state.lastResult) {
+    showResultPopup(state);
+  }
+
+  // Show winner overlay for final round
+  if (state.phase === "gameover") {
+    document.getElementById("winnerNameBig").textContent = state.finalWinner || "—";
+    winnerOverlay.classList.remove("hidden");
+    resultPopup.classList.add("hidden");
+  }
 });
 
 socket.on("forceReload", () => window.location.reload());
 
 // ── Result Popup ──────────────────────────────────────────────────────────────
 function showResultPopup(state) {
-  if (!state?.lastResult) return;
   const r = state.lastResult;
+  if (!r) return;
 
-  document.getElementById("popupRound").textContent = state.round;
-  document.getElementById("popupAvg").textContent = r.average;
+  document.getElementById("popupRound").textContent  = state.round;
+  document.getElementById("popupAvg").textContent    = r.average;
   document.getElementById("popupTarget").textContent = r.target;
   document.getElementById("popupWinner").textContent = r.winnerName;
-  document.getElementById("popupElim").textContent = r.eliminatedName;
+  document.getElementById("popupElim").textContent   = r.eliminatedName;
 
-  // Submissions list sorted by distance
   const subs = [...r.submissions].sort((a, b) => a.distance - b.distance);
   document.getElementById("popupSubmissions").innerHTML = subs.map((s, i) => {
     const isWinner = s.name === r.winnerName;
@@ -94,20 +101,7 @@ function showResultPopup(state) {
   resultPopup.classList.remove("hidden");
 }
 
-function closeResultPopup() {
-  resultPopup.classList.add("hidden");
-}
-
-// ── Winner Overlay ────────────────────────────────────────────────────────────
-function updateWinner(state) {
-  if (state.phase === "gameover") {
-    document.getElementById("winnerNameBig").textContent = state.finalWinner || "—";
-    winnerOverlay.classList.remove("hidden");
-    resultPopup.classList.add("hidden");
-  } else {
-    winnerOverlay.classList.add("hidden");
-  }
-}
+function closeResultPopup() { resultPopup.classList.add("hidden"); }
 
 // ── Header ────────────────────────────────────────────────────────────────────
 function updateHeader(state) {
@@ -116,7 +110,7 @@ function updateHeader(state) {
   phaseBadge.textContent = phases[state.phase] || state.phase.toUpperCase();
   phaseBadge.className = "phase-badge";
   if (state.phase === "round") phaseBadge.classList.add("phase-round");
-  if (state.phase === "results" || state.phase === "calculating") phaseBadge.classList.add("phase-results");
+  if (state.phase === "results") phaseBadge.classList.add("phase-results");
 }
 
 // ── Players ───────────────────────────────────────────────────────────────────
@@ -129,7 +123,7 @@ function updatePlayers(state) {
   activePlayerList.innerHTML = active.length === 0
     ? `<div class="empty-state">Waiting for players...<br><span style="color:var(--green);font-size:0.8rem">Room: ${currentRoomCode}</span></div>`
     : active.map(([, p]) => `
-        <div class="player-item ${p.submitted ? "submitted" : "not-submitted"}">
+        <div class="player-item ${p.submitted ? "submitted" : ""}">
           <span class="p-name">${esc(p.name)}</span>
           <span class="p-dot ${p.submitted ? "dot-green" : "dot-red"}"></span>
         </div>`).join("");
@@ -154,26 +148,25 @@ function updateSubmissions(state) {
     return;
   }
 
-  if (state.phase === "round" && !state.allSubmitted) {
-    submissionList.innerHTML = active.length === 0
-      ? `<div class="empty-state">Waiting for players...</div>`
-      : `<div class="status-grid">
-          ${active.map((p) => `
-            <div class="status-box ${p.submitted ? "status-green" : "status-red"}">
-              <span class="status-name">${esc(p.name)}</span>
-              <span class="status-icon">${p.submitted ? "✓" : "…"}</span>
-            </div>`).join("")}
-        </div>
-        <div class="waiting-label">Waiting for all players to submit...</div>`;
+  if (state.phase === "round") {
+    if (active.length === 0) { submissionList.innerHTML = `<div class="empty-state">Waiting for players...</div>`; return; }
+    if (state.allSubmitted) {
+      submissionList.innerHTML = `<div class="empty-state" style="color:var(--green)">✓ All players submitted!<br><span style="font-size:0.7rem;color:var(--text-dim)">Click SHOW RESULT</span></div>`;
+      return;
+    }
+    submissionList.innerHTML = `
+      <div class="status-grid">
+        ${active.map((p) => `
+          <div class="status-box ${p.submitted ? "status-green" : "status-red"}">
+            <span class="status-name">${esc(p.name)}</span>
+            <span class="status-icon">${p.submitted ? "✓" : "…"}</span>
+          </div>`).join("")}
+      </div>
+      <div class="waiting-label">Waiting for all players to submit...</div>`;
     return;
   }
 
-  if (state.allSubmitted && state.phase === "round") {
-    submissionList.innerHTML = `<div class="empty-state" style="color:var(--green)">✓ All players submitted!<br><span style="font-size:0.7rem;color:var(--text-dim)">Click CALCULATE then SHOW RESULT</span></div>`;
-    return;
-  }
-
-  if (state.phase === "results" && state.lastResult) {
+  if ((state.phase === "results" || state.phase === "gameover") && state.lastResult) {
     const subs = [...state.lastResult.submissions].sort((a, b) => a.distance - b.distance);
     submissionList.innerHTML = subs.map((s) => {
       const isWinner = s.name === state.lastResult.winnerName;
@@ -193,11 +186,10 @@ function updateSubmissions(state) {
 function updateControls(state) {
   const p = state.phase;
   const active = Object.values(state.players).filter((pl) => pl.status === "active");
+  const anySubmitted = active.some((pl) => pl.submitted);
   btnStart.disabled      = !(p === "lobby" || p === "results");
-  btnCalc.disabled       = !(p === "round" && active.some((pl) => pl.submitted));
-  btnShowResult.disabled = !(p === "results");
+  btnShowResult.disabled = !(p === "round" && anySubmitted);
   btnNext.disabled       = !(p === "results");
-  btnEnd.disabled        = (p === "gameover");
 }
 
 function esc(str) {
