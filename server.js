@@ -5,7 +5,11 @@ const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  transports: ["websocket", "polling"],
+});
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -30,18 +34,44 @@ function resetNumbers(state) {
   });
 }
 
+// Send host state — numbers hidden during round, shown only after all submitted
+function getHostState(state) {
+  const active = activePlayers(state);
+  const allSubmitted = active.length > 0 && active.every((p) => p.submitted);
+  
+  const sanitizedPlayers = {};
+  Object.entries(state.players).forEach(([id, p]) => {
+    sanitizedPlayers[id] = {
+      ...p,
+      // Hide number during round unless all have submitted
+      number: (state.phase === "round" && !allSubmitted) ? null : p.number,
+    };
+  });
+
+  return { ...state, players: sanitizedPlayers, allSubmitted };
+}
+
 function broadcastState(roomCode) {
   const room = rooms[roomCode];
   if (!room) return;
   const state = room.state;
-  io.to(`host:${roomCode}`).emit("gameState", state);
+
+  // Send host state (numbers hidden until all submitted)
+  io.to(`host:${roomCode}`).emit("gameState", getHostState(state));
+
+  // Send each player only their own state — NOT triggering full re-render
   Object.entries(state.players).forEach(([id, p]) => {
     const socket = io.sockets.sockets.get(id);
     if (socket) {
       socket.emit("playerState", {
-        phase: state.phase, round: state.round, name: p.name,
-        status: p.status, submitted: p.submitted,
-        lastResult: state.lastResult, finalWinner: state.finalWinner, roomCode,
+        phase: state.phase,
+        round: state.round,
+        name: p.name,
+        status: p.status,
+        submitted: p.submitted,
+        lastResult: state.lastResult,
+        finalWinner: state.finalWinner,
+        roomCode,
       });
     }
   });
@@ -57,9 +87,8 @@ io.on("connection", (socket) => {
     socket.join(`host:${roomCode}`);
     socket.data.roomCode = roomCode;
     socket.data.role = "host";
-    console.log(`Room created: ${roomCode}`);
     socket.emit("roomCreated", { roomCode });
-    socket.emit("gameState", rooms[roomCode].state);
+    socket.emit("gameState", getHostState(rooms[roomCode].state));
   });
 
   // Host rejoins
@@ -71,7 +100,7 @@ io.on("connection", (socket) => {
     socket.data.roomCode = roomCode;
     socket.data.role = "host";
     socket.emit("roomCreated", { roomCode });
-    socket.emit("gameState", room.state);
+    socket.emit("gameState", getHostState(room.state));
   });
 
   // Player joins room
@@ -89,7 +118,6 @@ io.on("connection", (socket) => {
     room.state.players[socket.id] = { name: trimmed, number: null, distance: null, submitted: false, status: "active" };
     socket.data.roomCode = code;
     socket.data.role = "player";
-    console.log(`${trimmed} joined room ${code}`);
     broadcastState(code);
   });
 
@@ -103,10 +131,22 @@ io.on("connection", (socket) => {
     if (isNaN(n) || n < 0 || n > 100) return;
     player.number = n;
     player.submitted = true;
+
+    // Send player their confirmation immediately
+    socket.emit("playerState", {
+      phase: room.state.phase, round: room.state.round,
+      name: player.name, status: player.status,
+      submitted: true, lastResult: room.state.lastResult,
+      finalWinner: room.state.finalWinner, roomCode: socket.data.roomCode,
+    });
+
+    // Broadcast updated status to host
     broadcastState(socket.data.roomCode);
+
+    // Auto-calculate if all submitted
     const active = activePlayers(room.state);
-    if (active.every((p) => p.submitted) && active.length > 1) {
-      setTimeout(() => calculateResult(socket.data.roomCode), 500);
+    if (active.length > 1 && active.every((p) => p.submitted)) {
+      setTimeout(() => calculateResult(socket.data.roomCode), 800);
     }
   });
 

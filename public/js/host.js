@@ -1,22 +1,20 @@
-const socket = io();
+const socket = io({ transports: ["websocket", "polling"] });
 let currentRoomCode = null;
 
 // ── Setup Screen ──────────────────────────────────────────────────────────────
-const setupScreen   = document.getElementById("screen-setup");
+const setupScreen     = document.getElementById("screen-setup");
 const dashboardScreen = document.getElementById("screen-dashboard");
-const roomCodeInput = document.getElementById("roomCodeInput");
-const createRoomBtn = document.getElementById("createRoomBtn");
-const setupError    = document.getElementById("setupError");
+const roomCodeInput   = document.getElementById("roomCodeInput");
+const createRoomBtn   = document.getElementById("createRoomBtn");
+const setupError      = document.getElementById("setupError");
 
 createRoomBtn.addEventListener("click", () => {
   const code = roomCodeInput.value.trim().toUpperCase();
   if (!code) { setupError.textContent = "Please enter a room code."; return; }
   socket.emit("createRoom", { code });
 });
-
 roomCodeInput.addEventListener("keydown", (e) => { if (e.key === "Enter") createRoomBtn.click(); });
 roomCodeInput.addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase(); });
-
 socket.on("roomError", (msg) => { setupError.textContent = msg; });
 
 socket.on("roomCreated", ({ roomCode }) => {
@@ -79,30 +77,66 @@ function updatePlayers(state) {
   const elims  = state.eliminated || [];
   activeCount.textContent = active.length;
   elimCount.textContent   = elims.length;
+
   activePlayerList.innerHTML = active.length === 0
-    ? `<div class="empty-state">Waiting for players to join...<br><span style="color:var(--green);font-size:0.8rem">Room: ${currentRoomCode}</span></div>`
-    : active.map(([, p]) => `<div class="player-item ${p.submitted ? "submitted" : ""}">
-        <span class="p-name">${esc(p.name)}</span>
-        <span class="p-status">${p.submitted ? "SUBMITTED ✓" : "WAITING..."}</span>
-      </div>`).join("");
+    ? `<div class="empty-state">Waiting for players...<br><span style="color:var(--green);font-size:0.8rem">Room: ${currentRoomCode}</span></div>`
+    : active.map(([, p]) => `
+        <div class="player-item ${p.submitted ? "submitted" : "not-submitted"}">
+          <span class="p-name">${esc(p.name)}</span>
+          <span class="p-dot ${p.submitted ? "dot-green" : "dot-red"}"></span>
+        </div>`).join("");
+
   elimPlayerList.innerHTML = elims.length === 0
     ? `<div class="empty-state">None yet</div>`
-    : elims.slice().reverse().map((e) => `<div class="player-item eliminated-item">
-        <span class="p-name">${esc(e.name)}</span>
-        <span class="elim-round">R${e.round}</span>
-      </div>`).join("");
+    : elims.slice().reverse().map((e) =>
+        `<div class="player-item eliminated-item">
+          <span class="p-name">${esc(e.name)}</span>
+          <span class="elim-round">R${e.round}</span>
+        </div>`).join("");
 }
 
 function updateSubmissions(state) {
   const active    = Object.values(state.players).filter((p) => p.status === "active");
   const submitted = active.filter((p) => p.submitted);
-  subCount.textContent = `${submitted.length} / ${active.length}`;
+  const total     = active.length;
+  const subDone   = submitted.length;
+
+  subCount.textContent = `${subDone} / ${total}`;
+
+  // During round: show only green/red status boxes, NOT numbers
+  if (state.phase === "round" && !state.allSubmitted) {
+    submissionList.innerHTML = active.length === 0
+      ? `<div class="empty-state">Waiting for players...</div>`
+      : `<div class="status-grid">
+          ${active.map((p) => `
+            <div class="status-box ${p.submitted ? "status-green" : "status-red"}">
+              <span class="status-name">${esc(p.name)}</span>
+              <span class="status-icon">${p.submitted ? "✓" : "…"}</span>
+            </div>`).join("")}
+        </div>
+        <div class="waiting-label">Waiting for all players to submit...</div>`;
+    return;
+  }
+
+  // All submitted or results phase — show numbers
+  if (state.phase === "lobby" && !state.lastResult) {
+    submissionList.innerHTML = `<div class="empty-state">Start a round to collect numbers</div>`;
+    return;
+  }
+
   const r = state.lastResult;
-  if (submitted.length === 0 && state.phase === "lobby") { submissionList.innerHTML = `<div class="empty-state">Start a round to collect numbers</div>`; return; }
-  if (submitted.length === 0) { submissionList.innerHTML = `<div class="empty-state">Waiting for submissions...</div>`; return; }
-  const sorted = [...submitted].sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999));
-  submissionList.innerHTML = sorted.map((p) => {
-    let cls = ""; let distHtml = "";
+  const toShow = state.allSubmitted
+    ? active
+    : (r ? r.submissions.map((s) => ({ name: s.name, number: s.number, distance: s.distance, submitted: true })) : submitted);
+
+  if (!toShow || toShow.length === 0) {
+    submissionList.innerHTML = `<div class="empty-state">No submissions yet</div>`;
+    return;
+  }
+
+  submissionList.innerHTML = toShow.map((p) => {
+    let cls = "";
+    let distHtml = "";
     if (r) {
       if (p.name === r.winnerName) cls = "winner-sub";
       if (p.name === r.eliminatedName) cls = "loser-sub";
@@ -111,7 +145,9 @@ function updateSubmissions(state) {
     }
     return `<div class="sub-item ${cls}">
       <span class="sub-name">${esc(p.name)}</span>
-      <span style="display:flex;gap:0.75rem;align-items:center">${distHtml}<span class="sub-num">${p.number !== null ? p.number : "—"}</span></span>
+      <span style="display:flex;gap:0.75rem;align-items:center">
+        ${distHtml}<span class="sub-num">${p.number !== null && p.number !== undefined ? p.number : "—"}</span>
+      </span>
     </div>`;
   }).join("");
 }
