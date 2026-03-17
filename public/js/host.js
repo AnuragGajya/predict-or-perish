@@ -1,5 +1,6 @@
 const socket = io({ transports: ["websocket", "polling"] });
 let currentRoomCode = null;
+let latestState = null;
 
 // ── Setup Screen ──────────────────────────────────────────────────────────────
 const setupScreen     = document.getElementById("screen-setup");
@@ -34,35 +35,81 @@ const activePlayerList = document.getElementById("activePlayerList");
 const elimPlayerList   = document.getElementById("elimPlayerList");
 const subCount         = document.getElementById("subCount");
 const submissionList   = document.getElementById("submissionList");
-const resultContent    = document.getElementById("resultContent");
-const gameoverOverlay  = document.getElementById("gameoverOverlay");
-const goWinnerName     = document.getElementById("goWinnerName");
+const resultPopup      = document.getElementById("resultPopup");
+const winnerOverlay    = document.getElementById("winnerOverlay");
 
-const btnStart   = document.getElementById("btnStartRound");
-const btnCalc    = document.getElementById("btnCalculate");
-const btnNext    = document.getElementById("btnNextRound");
-const btnEnd     = document.getElementById("btnEndGame");
-const btnReset   = document.getElementById("btnReset");
-const btnGoReset = document.getElementById("goReset");
+const btnStart      = document.getElementById("btnStartRound");
+const btnCalc       = document.getElementById("btnCalculate");
+const btnShowResult = document.getElementById("btnShowResult");
+const btnNext       = document.getElementById("btnNextRound");
+const btnEnd        = document.getElementById("btnEndGame");
+const btnReset      = document.getElementById("btnReset");
+const popupClose    = document.getElementById("popupClose");
+const winnerReset   = document.getElementById("winnerReset");
 
-btnStart.addEventListener("click",   () => socket.emit("startRound"));
-btnCalc.addEventListener("click",    () => socket.emit("calculateResult"));
-btnNext.addEventListener("click",    () => socket.emit("nextRound"));
-btnEnd.addEventListener("click",     () => { if (confirm("End the game and reveal the final winner?")) socket.emit("endGame"); });
-btnReset.addEventListener("click",   () => { if (confirm("Reset the entire game? All data will be lost.")) socket.emit("resetGame"); });
-btnGoReset.addEventListener("click", () => { if (confirm("Reset the entire game?")) socket.emit("resetGame"); });
+btnStart.addEventListener("click",      () => socket.emit("startRound"));
+btnCalc.addEventListener("click",       () => socket.emit("calculateResult"));
+btnShowResult.addEventListener("click", () => showResultPopup(latestState));
+btnNext.addEventListener("click",       () => { closeResultPopup(); socket.emit("nextRound"); });
+btnEnd.addEventListener("click",        () => { if (confirm("End the game and reveal the final winner?")) socket.emit("endGame"); });
+btnReset.addEventListener("click",      () => { if (confirm("Reset the entire game?")) socket.emit("resetGame"); });
+winnerReset.addEventListener("click",   () => { if (confirm("Reset the entire game?")) socket.emit("resetGame"); });
+popupClose.addEventListener("click",    () => closeResultPopup());
 
 socket.on("gameState", (state) => {
+  latestState = state;
   updateHeader(state);
   updatePlayers(state);
   updateSubmissions(state);
-  updateResult(state);
   updateControls(state);
-  updateGameover(state);
+  updateWinner(state);
 });
 
 socket.on("forceReload", () => window.location.reload());
 
+// ── Result Popup ──────────────────────────────────────────────────────────────
+function showResultPopup(state) {
+  if (!state?.lastResult) return;
+  const r = state.lastResult;
+
+  document.getElementById("popupRound").textContent = state.round;
+  document.getElementById("popupAvg").textContent = r.average;
+  document.getElementById("popupTarget").textContent = r.target;
+  document.getElementById("popupWinner").textContent = r.winnerName;
+  document.getElementById("popupElim").textContent = r.eliminatedName;
+
+  // Submissions list sorted by distance
+  const subs = [...r.submissions].sort((a, b) => a.distance - b.distance);
+  document.getElementById("popupSubmissions").innerHTML = subs.map((s, i) => {
+    const isWinner = s.name === r.winnerName;
+    const isElim   = s.name === r.eliminatedName;
+    return `<div class="popup-sub-row ${isWinner ? "popup-winner-row" : ""} ${isElim ? "popup-elim-row" : ""}">
+      <span class="popup-rank">${i + 1}</span>
+      <span class="popup-pname">${esc(s.name)}</span>
+      <span class="popup-pnum">${s.number}</span>
+      <span class="popup-pdist">Δ ${s.distance}</span>
+    </div>`;
+  }).join("");
+
+  resultPopup.classList.remove("hidden");
+}
+
+function closeResultPopup() {
+  resultPopup.classList.add("hidden");
+}
+
+// ── Winner Overlay ────────────────────────────────────────────────────────────
+function updateWinner(state) {
+  if (state.phase === "gameover") {
+    document.getElementById("winnerNameBig").textContent = state.finalWinner || "—";
+    winnerOverlay.classList.remove("hidden");
+    resultPopup.classList.add("hidden");
+  } else {
+    winnerOverlay.classList.add("hidden");
+  }
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
 function updateHeader(state) {
   roundBadge.textContent = `ROUND ${state.round}`;
   const phases = { lobby: "LOBBY", round: "ROUND OPEN", calculating: "CALCULATING", results: "RESULTS", gameover: "GAME OVER" };
@@ -72,6 +119,7 @@ function updateHeader(state) {
   if (state.phase === "results" || state.phase === "calculating") phaseBadge.classList.add("phase-results");
 }
 
+// ── Players ───────────────────────────────────────────────────────────────────
 function updatePlayers(state) {
   const active = Object.entries(state.players).filter(([, p]) => p.status === "active");
   const elims  = state.eliminated || [];
@@ -95,15 +143,17 @@ function updatePlayers(state) {
         </div>`).join("");
 }
 
+// ── Submissions ───────────────────────────────────────────────────────────────
 function updateSubmissions(state) {
   const active    = Object.values(state.players).filter((p) => p.status === "active");
   const submitted = active.filter((p) => p.submitted);
-  const total     = active.length;
-  const subDone   = submitted.length;
+  subCount.textContent = `${submitted.length} / ${active.length}`;
 
-  subCount.textContent = `${subDone} / ${total}`;
+  if (state.phase === "lobby" && !state.lastResult) {
+    submissionList.innerHTML = `<div class="empty-state">Start a round to collect numbers</div>`;
+    return;
+  }
 
-  // During round: show only green/red status boxes, NOT numbers
   if (state.phase === "round" && !state.allSubmitted) {
     submissionList.innerHTML = active.length === 0
       ? `<div class="empty-state">Waiting for players...</div>`
@@ -118,68 +168,36 @@ function updateSubmissions(state) {
     return;
   }
 
-  // All submitted or results phase — show numbers
-  if (state.phase === "lobby" && !state.lastResult) {
-    submissionList.innerHTML = `<div class="empty-state">Start a round to collect numbers</div>`;
+  if (state.allSubmitted && state.phase === "round") {
+    submissionList.innerHTML = `<div class="empty-state" style="color:var(--green)">✓ All players submitted!<br><span style="font-size:0.7rem;color:var(--text-dim)">Click CALCULATE then SHOW RESULT</span></div>`;
     return;
   }
 
-  const r = state.lastResult;
-  const toShow = state.allSubmitted
-    ? active
-    : (r ? r.submissions.map((s) => ({ name: s.name, number: s.number, distance: s.distance, submitted: true })) : submitted);
-
-  if (!toShow || toShow.length === 0) {
-    submissionList.innerHTML = `<div class="empty-state">No submissions yet</div>`;
-    return;
+  if (state.phase === "results" && state.lastResult) {
+    const subs = [...state.lastResult.submissions].sort((a, b) => a.distance - b.distance);
+    submissionList.innerHTML = subs.map((s) => {
+      const isWinner = s.name === state.lastResult.winnerName;
+      const isElim   = s.name === state.lastResult.eliminatedName;
+      return `<div class="sub-item ${isWinner ? "winner-sub" : ""} ${isElim ? "loser-sub" : ""}">
+        <span class="sub-name">${esc(s.name)}</span>
+        <span style="display:flex;gap:0.5rem;align-items:center">
+          <span class="sub-dist">Δ${s.distance}</span>
+          <span class="sub-num">${s.number}</span>
+        </span>
+      </div>`;
+    }).join("");
   }
-
-  submissionList.innerHTML = toShow.map((p) => {
-    let cls = "";
-    let distHtml = "";
-    if (r) {
-      if (p.name === r.winnerName) cls = "winner-sub";
-      if (p.name === r.eliminatedName) cls = "loser-sub";
-      const sub = r.submissions?.find((s) => s.name === p.name);
-      if (sub) distHtml = `<span class="sub-dist">Δ ${sub.distance}</span>`;
-    }
-    return `<div class="sub-item ${cls}">
-      <span class="sub-name">${esc(p.name)}</span>
-      <span style="display:flex;gap:0.75rem;align-items:center">
-        ${distHtml}<span class="sub-num">${p.number !== null && p.number !== undefined ? p.number : "—"}</span>
-      </span>
-    </div>`;
-  }).join("");
 }
 
-function updateResult(state) {
-  const r = state.lastResult;
-  if (!r) { resultContent.innerHTML = `<div class="empty-state">No results yet</div>`; return; }
-  resultContent.innerHTML = `
-    <div class="result-stat"><span class="rs-label">AVERAGE</span><span class="rs-val">${r.average}</span></div>
-    <div class="result-stat"><span class="rs-label">TARGET (×0.8)</span><span class="rs-val green big">${r.target}</span></div>
-    <div class="result-stat" style="margin-top:0.5rem;border-top:1px solid var(--border);padding-top:0.75rem">
-      <span class="rs-label">WINNER</span><span class="rs-val green">🏆 ${esc(r.winnerName)}</span>
-    </div>
-    <div class="result-stat"><span class="rs-label">ELIMINATED</span><span class="rs-val red">✕ ${esc(r.eliminatedName)}</span></div>`;
-}
-
+// ── Controls ──────────────────────────────────────────────────────────────────
 function updateControls(state) {
   const p = state.phase;
   const active = Object.values(state.players).filter((pl) => pl.status === "active");
-  btnStart.disabled = !(p === "lobby" || p === "results");
-  btnCalc.disabled  = !(p === "round" && active.some((pl) => pl.submitted));
-  btnNext.disabled  = !(p === "results");
-  btnEnd.disabled   = (p === "gameover");
-}
-
-function updateGameover(state) {
-  if (state.phase === "gameover") {
-    goWinnerName.textContent = state.finalWinner || "—";
-    gameoverOverlay.classList.remove("hidden");
-  } else {
-    gameoverOverlay.classList.add("hidden");
-  }
+  btnStart.disabled      = !(p === "lobby" || p === "results");
+  btnCalc.disabled       = !(p === "round" && active.some((pl) => pl.submitted));
+  btnShowResult.disabled = !(p === "results");
+  btnNext.disabled       = !(p === "results");
+  btnEnd.disabled        = (p === "gameover");
 }
 
 function esc(str) {

@@ -26,13 +26,42 @@
     </div>
   </div>
 
-  <!-- GAMEOVER OVERLAY -->
-  <div id="gameoverOverlay" class="gameover-overlay hidden">
-    <div class="gameover-content">
-      <div class="go-tag">PREDICT OR PERISH</div>
-      <div class="go-label">WINNER</div>
-      <div class="go-name" id="goWinnerName">—</div>
-      <button id="goReset" class="btn btn-outline go-reset">RESET GAME</button>
+  <!-- RESULT POPUP -->
+  <div id="resultPopup" class="result-popup hidden">
+    <div class="result-popup-inner">
+      <div class="popup-title">ROUND <span id="popupRound">1</span> RESULTS</div>
+      <div class="popup-stats">
+        <div class="popup-stat-row">
+          <span class="popup-label">AVERAGE</span>
+          <span class="popup-val" id="popupAvg">—</span>
+        </div>
+        <div class="popup-stat-row">
+          <span class="popup-label">TARGET (×0.8)</span>
+          <span class="popup-val popup-green" id="popupTarget">—</span>
+        </div>
+      </div>
+      <div class="popup-submissions" id="popupSubmissions"></div>
+      <div class="popup-verdict">
+        <div class="verdict-winner">🏆 WINNER — <span id="popupWinner">—</span></div>
+        <div class="verdict-elim">✕ ELIMINATED — <span id="popupElim">—</span></div>
+      </div>
+      <button id="popupClose" class="ctrl-btn ctrl-yellow" style="margin-top:1rem">CLOSE RESULTS</button>
+    </div>
+  </div>
+
+  <!-- WINNER OVERLAY -->
+  <div id="winnerOverlay" class="winner-overlay hidden">
+    <div class="winner-bg"></div>
+    <div class="winner-content">
+      <div class="winner-tag">JACK OF HEARTS — FINAL WINNER</div>
+      <div class="winner-card-wrap">
+        <img src="/jack.png" alt="Jack of Hearts" class="jack-img" />
+      </div>
+      <div class="winner-congrats">CONGRATULATIONS</div>
+      <div class="winner-name" id="winnerNameBig">—</div>
+      <div class="winner-phrase">You are the Winner of the Event</div>
+      <div class="winner-event">JACK OF HEARTS</div>
+      <button id="winnerReset" class="btn btn-outline" style="margin-top:2rem">RESET GAME</button>
     </div>
   </div>
 
@@ -89,14 +118,6 @@
 
       <!-- RIGHT -->
       <div class="host-col host-col-right">
-        <div class="host-card" id="resultCard">
-          <div class="card-header">
-            <span class="card-title">CALCULATION</span>
-          </div>
-          <div id="resultContent" class="result-content">
-            <div class="empty-state">No results yet</div>
-          </div>
-        </div>
         <div class="host-card controls-card">
           <div class="card-header">
             <span class="card-title">CONTROLS</span>
@@ -104,6 +125,7 @@
           <div class="controls-grid">
             <button id="btnStartRound" class="ctrl-btn ctrl-green">START ROUND</button>
             <button id="btnCalculate" class="ctrl-btn ctrl-blue" disabled>CALCULATE</button>
+            <button id="btnShowResult" class="ctrl-btn ctrl-purple" disabled>SHOW RESULT</button>
             <button id="btnNextRound" class="ctrl-btn ctrl-yellow" disabled>NEXT ROUND</button>
             <button id="btnEndGame" class="ctrl-btn ctrl-red">END GAME</button>
             <button id="btnReset" class="ctrl-btn ctrl-ghost">RESET GAME</button>
