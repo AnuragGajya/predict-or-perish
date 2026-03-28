@@ -97,6 +97,51 @@ io.on("connection", (socket) => {
     socket.emit("gameState", getHostState(room.state));
   });
 
+  // Player reconnects mid-game — restore their session
+  // Player requests to rejoin — host must approve
+  socket.on("requestRejoin", ({ name, roomCode }) => {
+    const code = roomCode.trim().toUpperCase();
+    const room = getRoom(code);
+    if (!room) { socket.emit("rejoinDenied", "Room not found. The game may have ended."); return; }
+    const trimmed = name.trim().slice(0, 20);
+    const existingEntry = Object.entries(room.state.players).find(
+      ([, p]) => p.name.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (!existingEntry) { socket.emit("rejoinDenied", "Your name was not found in this game."); return; }
+    socket.emit("rejoinPending");
+    io.to(`host:${code}`).emit("rejoinRequest", { socketId: socket.id, name: trimmed, roomCode: code });
+  });
+
+  // Host approves rejoin
+  socket.on("admitPlayer", ({ socketId, name, roomCode }) => {
+    const code = roomCode.trim().toUpperCase();
+    const room = getRoom(code);
+    if (!room) return;
+    const trimmed = name.trim().slice(0, 20);
+    const existingEntry = Object.entries(room.state.players).find(
+      ([, p]) => p.name.toLowerCase() === trimmed.toLowerCase()
+    );
+    const playerSocket = io.sockets.sockets.get(socketId);
+    if (!playerSocket) return;
+    if (existingEntry) {
+      const [oldId, playerData] = existingEntry;
+      delete room.state.players[oldId];
+      room.state.players[socketId] = playerData;
+    } else {
+      room.state.players[socketId] = { name: trimmed, number: null, distance: null, submitted: false, status: "active" };
+    }
+    playerSocket.data.roomCode = code;
+    playerSocket.data.role = "player";
+    playerSocket.emit("rejoinAdmitted");
+    broadcastState(code);
+  });
+
+  // Host denies rejoin
+  socket.on("denyPlayer", ({ socketId }) => {
+    const playerSocket = io.sockets.sockets.get(socketId);
+    if (playerSocket) playerSocket.emit("rejoinDenied", "Host denied your rejoin request.");
+  });
+
   socket.on("joinPlayer", ({ name, roomCode }) => {
     const code = roomCode.trim().toUpperCase();
     const room = getRoom(code);
@@ -246,6 +291,16 @@ io.on("connection", (socket) => {
     }
   });
 });
+
+// ── Keep-alive: prevent Render free tier cold starts ─────────────────────────
+const SELF_URL = process.env.RENDER_EXTERNAL_URL || null;
+if (SELF_URL) {
+  setInterval(() => {
+    require("https").get(SELF_URL, (res) => {
+      console.log(`[keep-alive] ping ${res.statusCode}`);
+    }).on("error", (e) => console.warn("[keep-alive] error:", e.message));
+  }, 10 * 60 * 1000); // every 10 minutes
+}
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => console.log(`Predict or Perish running on http://localhost:${PORT}`));

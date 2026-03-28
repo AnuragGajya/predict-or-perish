@@ -1,8 +1,76 @@
-const socket = io({ transports: ["websocket", "polling"] });
+const socket = io({
+  transports: ["websocket", "polling"],
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+});
 let currentRoomCode = null;
 let latestState = null;
 
-// ── Setup ─────────────────────────────────────────────────────────────────────
+// ── Connection Status Banner ───────────────────────────────────────────────────
+const hostBanner = document.createElement("div");
+hostBanner.id = "conn-banner";
+hostBanner.style.cssText = `
+  display:none; position:fixed; top:0; left:0; right:0; z-index:9999;
+  background:#c0392b; color:#fff; text-align:center;
+  padding:10px; font-family:monospace; font-size:0.85rem; letter-spacing:0.05em;
+`;
+hostBanner.textContent = "⚠ CONNECTION LOST — RECONNECTING...";
+document.body.prepend(hostBanner);
+
+socket.on("disconnect", () => { hostBanner.style.display = "block"; });
+socket.on("connect", () => {
+  hostBanner.style.display = "none";
+  if (currentRoomCode) {
+    socket.emit("rejoinHost", { roomCode: currentRoomCode });
+  }
+});
+
+// ── Rejoin Requests ───────────────────────────────────────────────────────────
+const rejoinCard  = document.getElementById("rejoinCard");
+const rejoinList  = document.getElementById("rejoinList");
+const rejoinCount = document.getElementById("rejoinCount");
+const pendingRejoins = {}; // socketId -> { name, roomCode }
+
+socket.on("rejoinRequest", ({ socketId, name, roomCode }) => {
+  pendingRejoins[socketId] = { name, roomCode };
+  renderRejoinRequests();
+});
+
+function renderRejoinRequests() {
+  const entries = Object.entries(pendingRejoins);
+  rejoinCount.textContent = entries.length;
+  if (entries.length === 0) {
+    rejoinCard.style.display = "none";
+    return;
+  }
+  rejoinCard.style.display = "";
+  rejoinList.innerHTML = entries.map(([sid, { name, roomCode }]) => `
+    <div class="player-item" style="justify-content:space-between;gap:0.5rem">
+      <span class="p-name" style="color:#f1c40f">${esc(name)}</span>
+      <span style="display:flex;gap:0.4rem">
+        <button onclick="admitPlayer('${sid}','${esc(name)}','${esc(roomCode)}')"
+          style="background:#27ae60;color:#fff;border:none;padding:4px 10px;font-family:monospace;font-size:0.75rem;cursor:pointer;border-radius:2px">ADMIT</button>
+        <button onclick="denyPlayer('${sid}','${esc(name)}')"
+          style="background:#c0392b;color:#fff;border:none;padding:4px 10px;font-family:monospace;font-size:0.75rem;cursor:pointer;border-radius:2px">DENY</button>
+      </span>
+    </div>`).join("");
+}
+
+function admitPlayer(socketId, name, roomCode) {
+  socket.emit("admitPlayer", { socketId, name, roomCode });
+  delete pendingRejoins[socketId];
+  renderRejoinRequests();
+}
+
+function denyPlayer(socketId, name) {
+  socket.emit("denyPlayer", { socketId });
+  delete pendingRejoins[socketId];
+  renderRejoinRequests();
+}
+
+
 const setupScreen     = document.getElementById("screen-setup");
 const dashboardScreen = document.getElementById("screen-dashboard");
 const roomCodeInput   = document.getElementById("roomCodeInput");
@@ -65,18 +133,18 @@ socket.on("gameState", (state) => {
     showResultPopup(state);
   }
 
-  // Show winner overlay for final round
+  // Show result popup first, THEN winner overlay for final round
   if (state.phase === "gameover") {
     document.getElementById("winnerNameBig").textContent = state.finalWinner || "—";
-    winnerOverlay.classList.remove("hidden");
-    resultPopup.classList.add("hidden");
+    if (state.lastResult) showResultPopup(state, true); // true = final round
+    // Overlay auto-shows after 4s, or host can click "REVEAL WINNER"
   }
 });
 
 socket.on("forceReload", () => window.location.reload());
 
 // ── Result Popup ──────────────────────────────────────────────────────────────
-function showResultPopup(state) {
+function showResultPopup(state, isFinal = false) {
   const r = state.lastResult;
   if (!r) return;
 
@@ -84,12 +152,12 @@ function showResultPopup(state) {
   document.getElementById("popupAvg").textContent    = r.average;
   document.getElementById("popupTarget").textContent = r.target;
   document.getElementById("popupWinner").textContent = r.winnerName;
-  document.getElementById("popupElim").textContent   = r.eliminatedName;
+  document.getElementById("popupElim").textContent   = isFinal ? "—" : r.eliminatedName;
 
   const subs = [...r.submissions].sort((a, b) => a.distance - b.distance);
   document.getElementById("popupSubmissions").innerHTML = subs.map((s, i) => {
     const isWinner = s.name === r.winnerName;
-    const isElim   = s.name === r.eliminatedName;
+    const isElim   = !isFinal && s.name === r.eliminatedName;
     return `<div class="popup-sub-row ${isWinner ? "popup-winner-row" : ""} ${isElim ? "popup-elim-row" : ""}">
       <span class="popup-rank">${i + 1}</span>
       <span class="popup-pname">${esc(s.name)}</span>
@@ -97,6 +165,27 @@ function showResultPopup(state) {
       <span class="popup-pdist">Δ ${s.distance}</span>
     </div>`;
   }).join("");
+
+  // Change the close button for the final round
+  if (isFinal) {
+    popupClose.textContent = "🏆 REVEAL WINNER";
+    popupClose.style.background = "var(--yellow, #f1c40f)";
+    popupClose.style.color = "#000";
+    popupClose.onclick = () => {
+      resultPopup.classList.add("hidden");
+      winnerOverlay.classList.remove("hidden");
+      // reset button for future use
+      popupClose.textContent = "CLOSE & CONTINUE";
+      popupClose.style.background = "";
+      popupClose.style.color = "";
+      popupClose.onclick = () => closeResultPopup();
+    };
+  } else {
+    popupClose.textContent = "CLOSE & CONTINUE";
+    popupClose.style.background = "";
+    popupClose.style.color = "";
+    popupClose.onclick = () => closeResultPopup();
+  }
 
   resultPopup.classList.remove("hidden");
 }

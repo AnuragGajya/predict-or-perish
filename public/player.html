@@ -77,6 +77,17 @@
     </div>
   </div>
 
+  <!-- REJOIN WAITING SCREEN -->
+  <div id="screen-rejoinwait" class="screen">
+    <div class="screen-inner">
+      <div class="player-badge" id="rejoinPlayerName"></div>
+      <div class="screen-title" style="color:var(--yellow, #f1c40f)">RECONNECTED</div>
+      <div class="pulse-ring"></div>
+      <p class="screen-sub">Waiting for host to admit you back...</p>
+      <div class="waiting-dots"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+
   <!-- ELIMINATED SCREEN -->
   <div id="screen-eliminated" class="screen">
     <div class="screen-inner eliminated-screen">
@@ -93,7 +104,14 @@
       <div class="screen-title">GAME OVER</div>
       <p class="screen-sub">The final winner is</p>
       <div class="final-winner-name" id="gameoverWinner">—</div>
-      <a href="/" class="btn btn-outline">Back to Home</a>
+      <div style="width:100%;margin-top:1.2rem">
+        <div class="result-stats" style="margin-bottom:0.8rem">
+          <div class="stat-row"><span class="stat-label">FINAL AVG</span><span class="stat-value" id="goAvg">—</span></div>
+          <div class="stat-row"><span class="stat-label">TARGET (×0.8)</span><span class="stat-value highlight-green" id="goTarget">—</span></div>
+        </div>
+        <div id="goSubmissions" style="font-family:monospace;font-size:0.8rem;width:100%;padding:0 0.5rem"></div>
+      </div>
+      <a href="/" class="btn btn-outline" style="margin-top:1.5rem">Back to Home</a>
     </div>
   </div>
 
