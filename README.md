@@ -1,24 +1,42 @@
 # 🔮 Predict or Perish
-### Live multiplayer intelligence game — Alice in Borderland inspired
 
-A real-time multiplayer game for college events. Players submit numbers, the target is **80% of the average**, and whoever is **farthest from the target gets eliminated**.
+**A live multiplayer "guess the target number" elimination game — Alice in Borderland inspired.**
+
+Built for college events, parties, and icebreakers. Players join from their phones, the host runs the show from a laptop or projector, and every round someone gets eliminated until one player remains.
 
 ---
 
 ## 🎮 How to Play
 
-1. Host opens the **Host Dashboard** on a laptop/projector
-2. Players join via their **phones** using the Player page
-3. Host clicks **Start Round** — players submit numbers (0–100)
-4. Host clicks **Calculate** — system finds the target and eliminates the farthest player
-5. Repeat until host clicks **End Game**
+1. **Host** opens the Host Dashboard and creates a room with a code.
+2. **Players** open the Player page on their phones, enter their name and the room code, and join.
+3. Host clicks **Start Round** — every active player submits a number between **0 and 100**.
+4. Host clicks **Show Result**. The system calculates:
+   - **Average** of all submitted numbers
+   - **Target** = Average × 0.8
+   - Whoever is **closest** to the target wins the round
+   - Whoever is **farthest** from the target is eliminated
+5. Host moves to the **next round** and repeats.
+6. The game ends once only **two players remain** — the round result on that final round decides the winner.
+
+---
+
+## ✨ Features
+
+- **Room-code based sessions** — multiple games can run independently on the same server
+- **Real-time updates** via Socket.io — no page refreshes needed
+- **Live submission tracking** — host dashboard shows who has/hasn't submitted, without revealing numbers mid-round
+- **Host-controlled reveal** — results (and round numbers) are only sent to players once the host shows them
+- **Reconnect with host approval** — if a player's connection drops mid-game, they can rejoin with the same name, but the host must approve the rejoin
+- **Automatic elimination tracking** — eliminated players and their elimination round are tracked for end-game recap
+- **Dark, dramatic UI** — scanline/noise overlay, monospace fonts, red/green elimination color coding, designed to look good projected on a big screen
 
 ---
 
 ## 🚀 Running Locally
 
 ### Prerequisites
-- Node.js v16 or higher
+- [Node.js](https://nodejs.org/) v16 or higher
 
 ### Steps
 
@@ -32,26 +50,49 @@ npm install
 
 # 3. Start the server
 npm start
-
-# 4. Open in browser
-# Host: http://localhost:3000/host.html
-# Players: http://localhost:3000/player.html
+# or, for auto-restart on file changes during development:
+npm run dev
 ```
 
-For players on phones — make sure all devices are on the **same WiFi network**, then share your laptop's local IP (e.g. `http://192.168.1.x:3000/player.html`).
+By default the server runs on **port 8080**:
+
+```
+http://localhost:8080
+```
+
+From there:
+- **Home page:** `http://localhost:8080/index.html`
+- **Host Dashboard:** `http://localhost:8080/host.html`
+- **Player page:** `http://localhost:8080/player.html`
+
+### Playing on the same WiFi network
+
+For players joining from their phones, make sure every device is on the **same WiFi network**, then share your computer's local IP instead of `localhost`, e.g.:
+
+```
+http://192.168.1.45:8080/player.html
+```
+
+You can find your local IP with `ipconfig` (Windows) or `ifconfig` / `ip a` (Mac/Linux).
 
 ---
 
-## ☁️ Deploying to Railway (Free Hosting)
+## ☁️ Deploying (Free Hosting)
 
-1. Push this repo to GitHub
-2. Go to [railway.app](https://railway.app) and sign in with GitHub
-3. Click **New Project → Deploy from GitHub repo**
-4. Select this repo — Railway auto-detects Node.js
-5. Your app will be live at a public URL like `https://predict-or-perish.up.railway.app`
-6. Share the URL with players — no WiFi restriction!
+### Render.com
+1. Push this repo to GitHub.
+2. Go to [render.com](https://render.com) → **New → Web Service** → connect your GitHub repo.
+3. Set:
+   - **Build command:** `npm install`
+   - **Start command:** `npm start`
+4. Render assigns the port automatically via `process.env.PORT`, so no changes needed.
+5. The server includes a built-in keep-alive ping (every 10 minutes) to help avoid Render's free-tier cold starts — just make sure the `RENDER_EXTERNAL_URL` environment variable is set (Render sets this automatically on most plans).
 
-> **Render.com** also works: go to [render.com](https://render.com), create a new **Web Service**, connect GitHub repo, set build command `npm install` and start command `npm start`.
+### Railway.app
+1. Push this repo to GitHub.
+2. Go to [railway.app](https://railway.app) and sign in with GitHub.
+3. **New Project → Deploy from GitHub repo** → select this repo. Railway auto-detects Node.js and runs `npm start`.
+4. Share the generated public URL with players — no WiFi restrictions needed.
 
 ---
 
@@ -59,32 +100,39 @@ For players on phones — make sure all devices are on the **same WiFi network**
 
 ```
 predict-or-perish/
-├── server.js           # Node.js + Socket.io backend
+├── server.js              # Express + Socket.io backend — game logic, rooms, rounds
 ├── package.json
 ├── public/
-│   ├── index.html      # Home page (role selector)
-│   ├── player.html     # Player mobile interface
-│   ├── host.html       # Host dashboard (projector)
+│   ├── index.html         # Home page (role selector)
+│   ├── player.html        # Player mobile interface
+│   ├── host.html           # Host dashboard (projector view)
+│   ├── jack.png
 │   ├── css/
-│   │   └── style.css   # Dark dramatic theme
+│   │   └── style.css      # Dark, dramatic theme
 │   └── js/
-│       ├── player.js   # Player socket logic
-│       └── host.js     # Host dashboard logic
+│       ├── player.js      # Player-side Socket.io client logic
+│       └── host.js        # Host-side Socket.io client logic
 ```
 
 ---
 
 ## ⚙️ Tech Stack
 
-| Layer    | Technology          |
-|----------|---------------------|
-| Backend  | Node.js + Express   |
-| Realtime | Socket.io           |
-| Frontend | HTML + CSS + JS     |
-| Hosting  | Railway / Render    |
+| Layer     | Technology         |
+|-----------|---------------------|
+| Backend   | Node.js + Express  |
+| Realtime  | Socket.io           |
+| Frontend  | HTML + CSS + vanilla JS |
+| Hosting   | Render / Railway    |
 
 ---
 
 ## 🎨 Design
 
-Dark, dramatic aesthetic inspired by Alice in Borderland — scanline effects, monospace fonts, red/green elimination color coding, projector-ready host dashboard.
+Dark, dramatic aesthetic inspired by Alice in Borderland — scanline and noise overlay effects, monospace + condensed display fonts, red/green elimination color coding, and a host dashboard built to be read clearly from across a room.
+
+---
+
+## 📝 License
+
+This project doesn't currently specify a license. Add one (e.g. MIT) if you plan to share or open-source it publicly.
