@@ -4,6 +4,8 @@
 
 Built for college events, parties, and icebreakers. Players join from their phones, the host runs the show from a laptop or projector, and every round someone gets eliminated until one player remains.
 
+**🔗 Live demo:** [predict-or-perish.onrender.com](https://predict-or-perish.onrender.com/)
+
 ---
 
 ## 🎮 How to Play
@@ -77,9 +79,11 @@ You can find your local IP with `ipconfig` (Windows) or `ifconfig` / `ip a` (Mac
 
 ---
 
-## ☁️ Deploying (Free Hosting)
+## ☁️ Deployment
 
-### Render.com
+This project is currently live on **Render** at [predict-or-perish.onrender.com](https://predict-or-perish.onrender.com/).
+
+### Deploying your own copy on Render.com
 1. Push this repo to GitHub.
 2. Go to [render.com](https://render.com) → **New → Web Service** → connect your GitHub repo.
 3. Set:
@@ -87,6 +91,8 @@ You can find your local IP with `ipconfig` (Windows) or `ifconfig` / `ip a` (Mac
    - **Start command:** `npm start`
 4. Render assigns the port automatically via `process.env.PORT`, so no changes needed.
 5. The server includes a built-in keep-alive ping (every 10 minutes) to help avoid Render's free-tier cold starts — just make sure the `RENDER_EXTERNAL_URL` environment variable is set (Render sets this automatically on most plans).
+
+> **Note:** on Render's free tier, the service spins down after inactivity, so the very first load after a period of idle time can take 30–60 seconds to wake up. Give it a moment before players start joining.
 
 ### Railway.app
 1. Push this repo to GitHub.
