@@ -67,17 +67,6 @@ From there:
 - **Host Dashboard:** `http://localhost:8080/host.html`
 - **Player page:** `http://localhost:8080/player.html`
 
-### Playing on the same WiFi network
-
-For players joining from their phones, make sure every device is on the **same WiFi network**, then share your computer's local IP instead of `localhost`, e.g.:
-
-```
-http://192.168.1.45:8080/player.html
-```
-
-You can find your local IP with `ipconfig` (Windows) or `ifconfig` / `ip a` (Mac/Linux).
-
----
 
 ## ☁️ Deployment
 
@@ -91,8 +80,6 @@ This project is currently live on **Render** at [predict-or-perish.onrender.com]
    - **Start command:** `npm start`
 4. Render assigns the port automatically via `process.env.PORT`, so no changes needed.
 5. The server includes a built-in keep-alive ping (every 10 minutes) to help avoid Render's free-tier cold starts — just make sure the `RENDER_EXTERNAL_URL` environment variable is set (Render sets this automatically on most plans).
-
-> **Note:** on Render's free tier, the service spins down after inactivity, so the very first load after a period of idle time can take 30–60 seconds to wake up. Give it a moment before players start joining.
 
 ### Railway.app
 1. Push this repo to GitHub.
