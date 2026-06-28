@@ -67,21 +67,24 @@ From there:
 - **Host Dashboard:** `http://localhost:8080/host.html`
 - **Player page:** `http://localhost:8080/player.html`
 
+> **Note:** the steps above are for local development only. The live game runs on Render (see the demo link at the top) — players can join from **any network, anywhere**, no WiFi restrictions. This has been tested live with 30–40 players joining simultaneously from different networks.
+
+---
 
 ## ☁️ Deployment
 
-This project is currently live on **Render** at [predict-or-perish.onrender.com](https://predict-or-perish.onrender.com/).
+### Render.com
 
-### Deploying your own copy on Render.com
 1. Push this repo to GitHub.
-2. Go to [render.com](https://render.com) → **New → Web Service** → connect your GitHub repo.
-3. Set:
-   - **Build command:** `npm install`
-   - **Start command:** `npm start`
+2. Go to [render.com](https://render.com) and sign in with GitHub.
+3. Create a new **Web Service** and connect this repo.
 4. Render assigns the port automatically via `process.env.PORT`, so no changes needed.
 5. The server includes a built-in keep-alive ping (every 10 minutes) to help avoid Render's free-tier cold starts — just make sure the `RENDER_EXTERNAL_URL` environment variable is set (Render sets this automatically on most plans).
 
+> **Note:** on Render's free tier, the service spins down after inactivity, so the very first load after a period of idle time can take 30–60 seconds to wake up. Give it a moment before players start joining.
+
 ### Railway.app
+
 1. Push this repo to GitHub.
 2. Go to [railway.app](https://railway.app) and sign in with GitHub.
 3. **New Project → Deploy from GitHub repo** → select this repo. Railway auto-detects Node.js and runs `npm start`.
@@ -96,10 +99,9 @@ predict-or-perish/
 ├── server.js              # Express + Socket.io backend — game logic, rooms, rounds
 ├── package.json
 ├── public/
-│   ├── index.html         # Home page (role selector)
-│   ├── player.html        # Player mobile interface
-│   ├── host.html           # Host dashboard (projector view)
-│   ├── jack.png
+│   ├── index.html          # Home page (role selector)
+│   ├── player.html         # Player mobile interface
+│   ├── host.html            # Host dashboard (projector view)
 │   ├── css/
 │   │   └── style.css      # Dark, dramatic theme
 │   └── js/
@@ -111,12 +113,12 @@ predict-or-perish/
 
 ## ⚙️ Tech Stack
 
-| Layer     | Technology         |
-|-----------|---------------------|
-| Backend   | Node.js + Express  |
-| Realtime  | Socket.io           |
-| Frontend  | HTML + CSS + vanilla JS |
-| Hosting   | Render / Railway    |
+| Layer     | Technology               |
+|-----------|---------------------------|
+| Backend   | Node.js + Express         |
+| Realtime  | Socket.io                 |
+| Frontend  | HTML + CSS + vanilla JS   |
+| Hosting   | Render / Railway          |
 
 ---
 
